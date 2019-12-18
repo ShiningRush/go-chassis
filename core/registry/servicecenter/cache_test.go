@@ -14,9 +14,9 @@ import (
 	"github.com/go-chassis/go-chassis/pkg/scclient"
 	"github.com/go-chassis/go-chassis/pkg/util/tags"
 	_ "github.com/go-chassis/go-chassis/security/plugins/plain"
-	"github.com/go-chassis/go-chassis/third_party/forked/k8s.io/apimachinery/pkg/util/rand"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func init() {
@@ -145,8 +145,7 @@ func TestCacheManager_MakeSchemaIndex(t *testing.T) {
 	p := os.Getenv("GOPATH")
 	os.Setenv("CHASSIS_HOME", filepath.Join(p, "src", "github.com", "go-chassis", "go-chassis", "examples", "discovery", "server"))
 	config.Init()
-	//Add autoIndex Key in Archaius
-	archaius.AddKeyValue("cse.service.registry.autoSchemaIndex", true)
+	archaius.Set("cse.service.registry.autoSchemaIndex", true)
 	config.GlobalDefinition.Cse.Service.Registry.ServiceDiscovery.RefreshInterval = "1"
 	registry.Enable()
 	registry.DoRegister()

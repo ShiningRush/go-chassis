@@ -24,16 +24,17 @@ const (
 
 //Route describe http route path and swagger specifications for API
 type Route struct {
-	Method           string             //Method is one of the following: GET,PUT,POST,DELETE. required
-	Path             string             //Path contains a path pattern. required
-	ResourceFunc     func(ctx *Context) //the func this API calls. you must set this field or ResourceFunc, if you set both, ResourceFunc will be used
-	ResourceFuncName string             //the func this API calls. you must set this field or ResourceFunc
-	FuncDesc         string             //tells what this route is all about. Optional.
-	Parameters       []*Parameters      //Parameters is a slice of request parameters for a single endpoint Optional.
-	Returns          []*Returns         //what kind of response this API returns. Optional.
-	Read             interface{}        //Read tells what resource type will be read from the request payload. Optional.
-	Consumes         []string           //Consumes specifies that this WebService can consume one or more MIME types.
-	Produces         []string           //Produces specifies that this WebService can produce one or more MIME types.
+	Method           string                 //Method is one of the following: GET,PUT,POST,DELETE. required
+	Path             string                 //Path contains a path pattern. required
+	ResourceFunc     func(ctx *Context)     //the func this API calls. you must set this field or ResourceFunc, if you set both, ResourceFunc will be used
+	ResourceFuncName string                 //the func this API calls. you must set this field or ResourceFunc
+	FuncDesc         string                 //tells what this route is all about. Optional.
+	Parameters       []*Parameters          //Parameters is a slice of request parameters for a single endpoint Optional.
+	Returns          []*Returns             //what kind of response this API returns. Optional.
+	Read             interface{}            //Read tells what resource type will be read from the request payload. Optional.
+	Consumes         []string               //Consumes specifies that this WebService can consume one or more MIME types.
+	Produces         []string               //Produces specifies that this WebService can produce one or more MIME types.
+	Metadata         map[string]interface{} //Metadata adds or updates a key=value pair to api
 }
 
 //Returns describe response doc
@@ -49,6 +50,7 @@ type Parameters struct {
 	DataType  string // string, int etc
 	ParamType int    //restful.QueryParameterKind or restful.PathParameterKind
 	Desc      string
+	Required  bool
 }
 
 //Router is to define how route the request
@@ -77,7 +79,7 @@ func GetRouteGroup(schema interface{}) string {
 func GetRouteSpecs(schema interface{}) ([]Route, error) {
 	v, ok := schema.(Router)
 	if !ok {
-		return []Route{}, fmt.Errorf("<rest.RegisterResource> is not implemetn Router interface")
+		return []Route{}, fmt.Errorf("can not register APIs to server: %s", reflect.TypeOf(schema).String())
 	}
 	return v.URLPatterns(), nil
 }
@@ -143,7 +145,7 @@ func WrapHandlerChain(route *Route, schema interface{}, schemaName string, opts 
 			bs := NewBaseServer(inv.Ctx)
 			bs.Req = req
 			bs.Resp = rep
-			ir.Status = bs.Resp.StatusCode()
+
 			// check body size
 			if opts.BodyLimit > 0 {
 				bs.Req.Request.Body = http.MaxBytesReader(bs.Resp, bs.Req.Request.Body, opts.BodyLimit)
@@ -151,6 +153,7 @@ func WrapHandlerChain(route *Route, schema interface{}, schemaName string, opts 
 
 			// call real route func
 			handleFunc(bs)
+			ir.Status = bs.Resp.StatusCode()
 
 			if bs.Resp.StatusCode() >= http.StatusBadRequest {
 				return fmt.Errorf("get err from http handle, get status: %d", bs.Resp.StatusCode())

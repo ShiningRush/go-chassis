@@ -1,6 +1,9 @@
 ![](logo.png)
 
-[![Build Status](https://travis-ci.org/go-chassis/go-chassis.svg?branch=master)](https://travis-ci.org/go-chassis/go-chassis)  [![Coverage Status](https://coveralls.io/repos/github/go-chassis/go-chassis/badge.svg)](https://coveralls.io/github/go-chassis/go-chassis) [![Go Report Card](https://goreportcard.com/badge/github.com/go-chassis/go-chassis)](https://goreportcard.com/report/github.com/go-chassis/go-chassis) [![GoDoc](https://godoc.org/github.com/go-chassis/go-chassis?status.svg)](https://godoc.org/github.com/go-chassis/go-chassis) [![HitCount](http://hits.dwyl.io/go-chassis/go-chassis.svg)](http://hits.dwyl.io/go-chassis/go-chassis)  [![Join Slack](https://img.shields.io/badge/Join-Slack-orange.svg)](https://join.slack.com/t/go-chassis/shared_invite/enQtMzk0MzAyMjEzNzEyLTRjOWE3NzNmN2IzOGZhMzZkZDFjODM1MDc5ZWI0YjcxYjM1ODNkY2RkNmIxZDdlOWI3NmQ0MTg3NzBkNGExZGU)      
+[![Build Status](https://travis-ci.com/go-chassis/go-chassis.svg?branch=master)](https://travis-ci.com/go-chassis/go-chassis)
+[![Coverage Status](https://coveralls.io/repos/github/go-chassis/go-chassis/badge.svg)](https://coveralls.io/github/go-chassis/go-chassis) [![Go Report Card](https://goreportcard.com/badge/github.com/go-chassis/go-chassis)](https://goreportcard.com/report/github.com/go-chassis/go-chassis) [![GoDoc](https://godoc.org/github.com/go-chassis/go-chassis?status.svg)](https://godoc.org/github.com/go-chassis/go-chassis) [![HitCount](http://hits.dwyl.io/go-chassis/go-chassis.svg)](http://hits.dwyl.io/go-chassis/go-chassis)  [![Join Slack](https://img.shields.io/badge/Join-Slack-orange.svg)](https://join.slack.com/t/go-chassis/shared_invite/enQtMzk0MzAyMjEzNzEyLTRjOWE3NzNmN2IzOGZhMzZkZDFjODM1MDc5ZWI0YjcxYjM1ODNkY2RkNmIxZDdlOWI3NmQ0MTg3NzBkNGExZGU)      
+
+[中文版README](README_cn.md)
 
 Go-Chassis is a microservice framework for rapid development of microservices in Go
 
@@ -39,6 +42,7 @@ you can use Istio configurations to control go chassis.
  - **Dynamic Configuration framework**: Powered by go-archaius, developer is able to develop a service which has hot-reconfiguration feature easily
  - **Fault Injection**: In consumer side, you can inject faults to bring chaos testing into your system
  - **API gateway and service mesh solution**: powered by [servicecomb-mesher](https://github.com/apache/servicecomb-mesher). 
+ - **Open API 2.0 support** go chassis will automatically generate Open API 2.0 doc and register it to service center. you can manage all the API docs in one place
 
 You can check [plugins](https://github.com/go-chassis/go-chassis-plugins) to see more features
 
@@ -108,7 +112,7 @@ so that user can manage service configurations by this service.
 - [apache/servicecomb-mesher](https://github.com/apache/servicecomb-mesher): 
 A service mesh able to co-work with go chassis, 
 it is able to run as a [API gateway](https://mesher.readthedocs.io/en/latest/configurations/edge.html) also.
-
+- [KubeEdge](https://github.com/kubeedge/kubeedge): Kubernetes Native Edge Computing Framework (project under CNCF) https://kubeedge.io
 
 # To start developing go chassis
 

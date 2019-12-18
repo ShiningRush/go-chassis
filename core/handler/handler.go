@@ -28,11 +28,13 @@ const (
 	RatelimiterConsumer = "ratelimiter-consumer"
 	Router              = "router"
 	FaultInject         = "fault-inject"
+	SkyWalkingConsumer  = "skywalking-consumer"
 
 	//provider chain
 	RatelimiterProvider = "ratelimiter-provider"
 	TracingProvider     = "tracing-provider"
 	BizkeeperProvider   = "bizkeeper-provider"
+	SkyWalkingProvider  = "skywalking-provider"
 )
 
 // init is for to initialize the all handlers at boot time
@@ -57,9 +59,11 @@ type Handler interface {
 	Name() string
 }
 
-func writeErr(err error, cb invocation.ResponseCallBack) {
+//WriteBackErr write err and callback
+func WriteBackErr(err error, status int, cb invocation.ResponseCallBack) {
 	r := &invocation.Response{
-		Err: err,
+		Err:    err,
+		Status: status,
 	}
 	cb(r)
 }

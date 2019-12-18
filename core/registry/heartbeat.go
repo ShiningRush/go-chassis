@@ -33,8 +33,6 @@ type HeartbeatService struct {
 // Start start the heartbeat system
 func (s *HeartbeatService) Start() {
 	s.shutdown = false
-	defer s.Stop()
-
 	s.run()
 }
 
@@ -46,7 +44,7 @@ func (s *HeartbeatService) Stop() {
 // AddTask add new micro-service instance to the heartbeat system
 func (s *HeartbeatService) AddTask(microServiceID, microServiceInstanceID string) {
 	key := fmt.Sprintf("%s/%s", microServiceID, microServiceInstanceID)
-	openlogging.GetLogger().Infof("Add HB task, task:%s", key)
+	openlogging.GetLogger().Infof("add heartbeat task:%s", key)
 	s.mux.Lock()
 	if _, ok := s.instances[key]; !ok {
 		s.instances[key] = &HeartbeatTask{
@@ -119,7 +117,7 @@ func (s *HeartbeatService) run() {
 
 // RetryRegister retrying to register micro-service, and instance
 func (s *HeartbeatService) RetryRegister(sid, iid string) {
-	for {
+	for !s.shutdown {
 		openlogging.Info("try to re-register")
 		_, err := DefaultServiceDiscoveryService.GetAllMicroServices()
 		if err != nil {
@@ -132,22 +130,22 @@ func (s *HeartbeatService) RetryRegister(sid, iid string) {
 			err = reRegisterSelfMSI(sid, iid)
 		}
 		if err == nil {
+			openlogging.Warn("Re-register self success")
 			break
 		}
 		time.Sleep(DefaultRetryTime)
 	}
-	openlogging.Warn("Re-register self success")
 }
 
 // ReRegisterSelfMSandMSI 重新注册微服务和实例
 func (s *HeartbeatService) ReRegisterSelfMSandMSI() error {
-	err := RegisterMicroservice()
+	err := RegisterService()
 	if err != nil {
 		openlogging.GetLogger().Errorf("The reRegisterSelfMSandMSI() startMicroservice failed: %s", err)
 		return err
 	}
 
-	err = RegisterMicroserviceInstances()
+	err = RegisterServiceInstances()
 	if err != nil {
 		openlogging.GetLogger().Errorf("The reRegisterSelfMSandMSI() startInstances failed: %s", err)
 		return err
@@ -179,11 +177,11 @@ func reRegisterSelfMSI(sid, iid string) error {
 
 	value, ok := SelfInstancesCache.Get(microServiceInstance.ServiceID)
 	if !ok {
-		openlogging.GetLogger().Warnf("RegisterMicroServiceInstance get SelfInstancesCache failed, microServiceID/instanceID: %s/%s", sid, instanceID)
+		openlogging.GetLogger().Warnf("register instance get SelfInstancesCache failed, microServiceID/instanceID: %s/%s", sid, instanceID)
 	}
 	instanceIDs, ok := value.([]string)
 	if !ok {
-		openlogging.GetLogger().Warnf("RegisterMicroServiceInstance type asserts failed, microServiceID/instanceID: %s/%s", sid, instanceID)
+		openlogging.GetLogger().Warnf("register instance type asserts failed, microServiceID/instanceID: %s/%s", sid, instanceID)
 	}
 	var isRepeat bool
 	for _, va := range instanceIDs {
@@ -195,7 +193,7 @@ func reRegisterSelfMSI(sid, iid string) error {
 		instanceIDs = append(instanceIDs, instanceID)
 	}
 	SelfInstancesCache.Set(microServiceInstance.ServiceID, instanceIDs, 0)
-	openlogging.GetLogger().Infof("RegisterMicroServiceInstance success, microServiceID/instanceID: %s/%s.", sid, instanceID)
+	openlogging.GetLogger().Infof("register instance success, microServiceID/instanceID: %s/%s.", sid, instanceID)
 
 	return nil
 }

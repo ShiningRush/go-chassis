@@ -5,16 +5,17 @@ Checkout full example in [here](https://github.com/go-chassis/go-chassis/tree/ma
 this section show you how to write a http server
 
 Create 1 project or go package as recommended 
+```
+server
 
-server/
++-- main.go
 
-├── conf
++-- conf
 
-│ ├── chassis.yaml
+    +-- chassis.yaml
 
-│ └── microservice.yaml
-
-└── main.go
+    +-- microservice.yaml
+```
 
 1.Write a struct to hold http logic and url patterns
 ```go
@@ -76,17 +77,17 @@ func main() {
 this section show you how to write a http client
 
 Create 1 project or go package as recommended 
+```
+client
 
-client/
++-- main.go
 
-├── conf
-
-│ ├── chassis.yaml
-
-│ └── microservice.yaml
-
-└── main.go
-
++-- conf
+    
+    +-- chassis.yaml
+    
+    +-- microservice.yaml
+```
 1. modify chassis.yaml
 ```yaml
 cse:
@@ -143,6 +144,8 @@ func (d *Data) URLPatterns() []rf.Route {
 	}
 }
 ````
+you can find yor open API doc in http://ip:port/apidocs.json, after you start your program
+,you can copy the response body into http://editor.swagger.io/ to read document.
 ```yaml
 swagger: "2.0"
 info:
@@ -211,8 +214,9 @@ Paramater type：
 	FormParameterKind
 ```
 
-### Automatically generate schema file in local directory
-The program will generate the schema file locally by default，If you want to define your own instead of automatically generating a schema，
+### Automatically generate schema file
+The program will generate the schema file locally by default, 
+If you want to define your own instead of automatically generating a schema，
 You can modify the configuration '**noRefreshSchema: true**' in chassis.yaml
 
 ```yaml

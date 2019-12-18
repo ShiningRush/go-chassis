@@ -22,9 +22,12 @@ import (
 var GlobalDefinition *model.GlobalCfg
 var lbConfig *model.LBWrapper
 
-// MicroserviceDefinition is having the info about application id, provider info, description of the service,
+// MicroserviceDefinition has info about application id, provider info, description of the service,
 // and description of the instance
 var MicroserviceDefinition *model.MicroserviceCfg
+
+//MonitorCfgDef has monitorv info, including zipkin and apm.
+var MonitorCfgDef *model.MonitorCfg
 
 //OldRouterDefinition is route rule config
 //Deprecated
@@ -35,14 +38,6 @@ var HystrixConfig *model.HystrixConfigWrapper
 
 // NodeIP gives the information of node ip
 var NodeIP string
-
-// SelfServiceName is self micro service name
-//Deprecated, plz use runtime.ServiceName
-var SelfServiceName string
-
-// SelfVersion gives version of the self micro service
-//Deprecated, use runtime pkg
-var SelfVersion string
 
 // ErrNoName is used to represent the service name missing error
 var ErrNoName = errors.New("micro service name is missing in description file")
@@ -62,9 +57,14 @@ func GetDataCenter() *model.DataCenterInfo {
 	return GlobalDefinition.DataCenter
 }
 
-// parse unmarshal configurations on respective structure
-func parse() error {
-	err := ReadGlobalConfigFile()
+//GetAPM return monitor config info
+func GetAPM() model.APMStruct {
+	return MonitorCfgDef.ServiceComb.APM
+}
+
+// readFromArchaius unmarshal configurations to expected pointer
+func readFromArchaius() error {
+	err := ReadGlobalConfigFromArchaius()
 	if err != nil {
 		return err
 	}
@@ -83,6 +83,9 @@ func parse() error {
 		return err
 	}
 
+	ReadMonitorFromArchaius()
+	//ReadMonitorFromFile()
+
 	populateConfigCenterAddress()
 	populateServiceRegistryAddress()
 	populateMonitorServerAddress()
@@ -97,12 +100,12 @@ func parse() error {
 // populateServiceRegistryAddress populate service registry address
 func populateServiceRegistryAddress() {
 	//Registry Address , higher priority for environment variable
-	registryAddrFromEnv := readCseAddress(common.EnvCSESCEndpoint, common.CseRegistryAddress)
-	openlogging.Debug("detect env", openlogging.WithTags(
-		openlogging.Tags{
-			"ep": registryAddrFromEnv,
-		}))
+	registryAddrFromEnv := readEndpoint(common.EnvCSESCEndpoint, common.CseRegistryAddress)
 	if registryAddrFromEnv != "" {
+		openlogging.Debug("detect env", openlogging.WithTags(
+			openlogging.Tags{
+				"ep": registryAddrFromEnv,
+			}))
 		GlobalDefinition.Cse.Service.Registry.Registrator.Address = registryAddrFromEnv
 		GlobalDefinition.Cse.Service.Registry.ServiceDiscovery.Address = registryAddrFromEnv
 		GlobalDefinition.Cse.Service.Registry.ContractDiscovery.Address = registryAddrFromEnv
@@ -113,20 +116,28 @@ func populateServiceRegistryAddress() {
 // populateConfigCenterAddress populate config center address
 func populateConfigCenterAddress() {
 	//Config Center Address , higher priority for environment variable
-	configCenterAddrFromEnv := readCseAddress(common.EnvCSECCEndpoint, common.CseConfigCenterAddress)
+	configCenterAddrFromEnv := readEndpoint(common.EnvCSECCEndpoint, common.CseConfigCenterAddress)
 	if configCenterAddrFromEnv != "" {
 		GlobalDefinition.Cse.Config.Client.ServerURI = configCenterAddrFromEnv
 	}
 }
 
-// readCseAddress
-func readCseAddress(firstEnv, singleEnv string) string {
+// readEndpoint
+func readEndpoint(firstEnv, singleEnv string) string {
 	addrFromEnv := os.Getenv(firstEnv)
-	if addrFromEnv == "" {
-		addrFromEnv = os.Getenv(common.EnvCSEEndpoint)
-		if addrFromEnv == "" {
-			addrFromEnv = archaius.GetString(singleEnv, "")
-		}
+	if addrFromEnv != "" {
+		openlogging.Info("read config from " + firstEnv)
+		return addrFromEnv
+	}
+	addrFromEnv = os.Getenv(common.EnvCSEEndpoint)
+	if addrFromEnv != "" {
+		openlogging.Info("read config from " + common.EnvCSEEndpoint)
+		return addrFromEnv
+	}
+	addrFromEnv = archaius.GetString(singleEnv, "")
+	if addrFromEnv != "" {
+		openlogging.Info("read config from " + singleEnv)
+		return addrFromEnv
 	}
 	return addrFromEnv
 }
@@ -134,7 +145,7 @@ func readCseAddress(firstEnv, singleEnv string) string {
 // populateMonitorServerAddress populate monitor server address
 func populateMonitorServerAddress() {
 	//Monitor Center Address , higher priority for environment variable
-	monitorServerAddrFromEnv := archaius.GetString(common.CseMonitorServer, "")
+	monitorServerAddrFromEnv := archaius.GetString(common.EnvCSEEndpoint, "")
 	if monitorServerAddrFromEnv != "" {
 		GlobalDefinition.Cse.Monitor.Client.ServerURI = monitorServerAddrFromEnv
 	}
@@ -168,14 +179,13 @@ func populateTenant() {
 	}
 }
 
-// ReadGlobalConfigFile for to unmarshal the global config file(chassis.yaml) information
-func ReadGlobalConfigFile() error {
-	globalDef := model.GlobalCfg{}
-	err := archaius.UnmarshalConfig(&globalDef)
+// ReadGlobalConfigFromArchaius for to unmarshal the global config file(chassis.yaml) information
+func ReadGlobalConfigFromArchaius() error {
+	GlobalDefinition = &model.GlobalCfg{}
+	err := archaius.UnmarshalConfig(&GlobalDefinition)
 	if err != nil {
 		return err
 	}
-	GlobalDefinition = &globalDef
 	return nil
 }
 
@@ -190,6 +200,34 @@ func ReadLBFromArchaius() error {
 	}
 	lbConfig = &lbDef
 
+	return nil
+}
+
+//ReadMonitorFromArchaius read monitor config from archauis pkg
+func ReadMonitorFromArchaius() error {
+	MonitorCfgDef = &model.MonitorCfg{}
+	err := archaius.UnmarshalConfig(&MonitorCfgDef)
+	if err != nil {
+		openlogging.Error("Config init failed. " + err.Error())
+		return err
+	}
+	return nil
+}
+
+//ReadMonitorFromFile read monitor config from local file  conf/monitoring.yaml
+func ReadMonitorFromFile() error {
+	defPath := fileutil.MonitoringConfigPath()
+	data, err := ioutil.ReadFile(defPath)
+	if err != nil {
+		openlogging.Error("Get monitor config from file failed. " + err.Error())
+		return err
+	}
+	MonitorCfgDef = &model.MonitorCfg{}
+	err = yaml.Unmarshal(data, &MonitorCfgDef)
+	if err != nil {
+		openlogging.Error("Get monitor config from file failed. " + err.Error())
+		return err
+	}
 	return nil
 }
 
@@ -236,7 +274,7 @@ func readMicroServiceConfigFiles() error {
 	MicroserviceDefinition = &model.MicroserviceCfg{}
 	//find only one microservice yaml
 	microserviceNames := schema.GetMicroserviceNames()
-	defPath := fileutil.GetMicroserviceDesc()
+	defPath := fileutil.MicroServiceConfigPath()
 	data, err := ioutil.ReadFile(defPath)
 	if err != nil {
 		openlogging.GetLogger().Errorf(fmt.Sprintf("WARN: Missing microservice description file: %s", err.Error()))
@@ -316,21 +354,19 @@ func Init() error {
 		return schemaError
 	}
 
-	//set microservice names
+	//set micro service names
 	msError := schema.SetMicroServiceNames(schemaPath)
 	if msError != nil {
 		return msError
 	}
 
 	NodeIP = archaius.GetString(common.EnvNodeIP, "")
-	err = parse()
+	err = readFromArchaius()
 	if err != nil {
 		return err
 	}
 
-	SelfServiceName = MicroserviceDefinition.ServiceDescription.Name
 	runtime.ServiceName = MicroserviceDefinition.ServiceDescription.Name
-	SelfVersion = MicroserviceDefinition.ServiceDescription.Version
 	runtime.Version = MicroserviceDefinition.ServiceDescription.Version
 	runtime.Environment = MicroserviceDefinition.ServiceDescription.Environment
 	runtime.MD = MicroserviceDefinition.ServiceDescription.Properties

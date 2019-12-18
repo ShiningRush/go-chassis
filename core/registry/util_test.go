@@ -162,4 +162,24 @@ func TestURIs2Hosts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "http", s)
 	assert.Equal(t, "127.0.0.1:8080", hosts[0])
+
+	t.Run("ip port", func(t *testing.T) {
+		hosts, s, err := registry.URIs2Hosts([]string{"127.0.0.1:8080"})
+		assert.NoError(t, err)
+		assert.Equal(t, "", s)
+		assert.Equal(t, "127.0.0.1:8080", hosts[0])
+	})
+	t.Run("host port", func(t *testing.T) {
+		hosts, s, err := registry.URIs2Hosts([]string{"ab.bb.com:8080"})
+		assert.NoError(t, err)
+		assert.Equal(t, "", s)
+		assert.Equal(t, "ab.bb.com:8080", hosts[0])
+	})
+
+	t.Run("https host port", func(t *testing.T) {
+		hosts, s, err := registry.URIs2Hosts([]string{"https://cse.cn-north-1.myhuaweicloud.com"})
+		assert.NoError(t, err)
+		assert.Equal(t, "https", s)
+		assert.Equal(t, "cse.cn-north-1.myhuaweicloud.com", hosts[0])
+	})
 }

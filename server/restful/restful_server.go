@@ -6,26 +6,23 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/go-chassis/go-chassis/core/registry"
-	"github.com/go-chassis/go-chassis/pkg/util/iputil"
-
+	"github.com/emicklei/go-restful"
 	"github.com/go-chassis/go-archaius"
 	"github.com/go-chassis/go-chassis/core/common"
-	"github.com/go-chassis/go-chassis/core/invocation"
-	"github.com/go-chassis/go-chassis/core/server"
-
-	"os"
-	"path/filepath"
-
-	"github.com/emicklei/go-restful"
 	globalconfig "github.com/go-chassis/go-chassis/core/config"
 	"github.com/go-chassis/go-chassis/core/config/schema"
+	"github.com/go-chassis/go-chassis/core/invocation"
+	"github.com/go-chassis/go-chassis/core/registry"
+	"github.com/go-chassis/go-chassis/core/server"
 	"github.com/go-chassis/go-chassis/pkg/metrics"
 	"github.com/go-chassis/go-chassis/pkg/runtime"
+	"github.com/go-chassis/go-chassis/pkg/util/iputil"
 	swagger "github.com/go-chassis/go-restful-swagger20"
 	"github.com/go-mesh/openlogging"
 )
@@ -38,6 +35,8 @@ const (
 	MimeFile          = "application/octet-stream"
 	MimeMult          = "multipart/form-data"
 )
+
+const openTLS = "?sslEnabled=true"
 
 func init() {
 	server.InstallPlugin(Name, newRestfulServer)
@@ -158,7 +157,9 @@ func Register2GoRestful(routeSpec Route, ws *restful.WebService, handler restful
 		return errors.New("method [" + routeSpec.Method + "] do not support")
 	}
 	rb = fillParam(routeSpec, rb)
-
+	for k, v := range routeSpec.Metadata {
+		rb = rb.Metadata(k, v)
+	}
 	for _, r := range routeSpec.Returns {
 		rb = rb.Returns(r.Code, r.Message, r.Model)
 	}
@@ -184,19 +185,21 @@ func Register2GoRestful(routeSpec Route, ws *restful.WebService, handler restful
 //fillParam is for handle parameter by type
 func fillParam(routeSpec Route, rb *restful.RouteBuilder) *restful.RouteBuilder {
 	for _, param := range routeSpec.Parameters {
+		p := &restful.Parameter{}
 		switch param.ParamType {
 		case restful.QueryParameterKind:
-			rb = rb.Param(restful.QueryParameter(param.Name, param.Desc).DataType(param.DataType))
+			p = restful.QueryParameter(param.Name, param.Desc)
 		case restful.PathParameterKind:
-			rb = rb.Param(restful.PathParameter(param.Name, param.Desc).DataType(param.DataType))
+			p = restful.PathParameter(param.Name, param.Desc)
 		case restful.HeaderParameterKind:
-			rb = rb.Param(restful.HeaderParameter(param.Name, param.Desc).DataType(param.DataType))
+			p = restful.HeaderParameter(param.Name, param.Desc)
 		case restful.BodyParameterKind:
-			rb = rb.Param(restful.BodyParameter(param.Name, param.Desc).DataType(param.DataType))
+			p = restful.BodyParameter(param.Name, param.Desc)
 		case restful.FormParameterKind:
-			rb = rb.Param(restful.FormParameter(param.Name, param.Desc).DataType(param.DataType))
-
+			p = restful.FormParameter(param.Name, param.Desc)
 		}
+		rb = rb.Param(p.Required(param.Required).DataType(param.DataType))
+
 	}
 	return rb
 }
@@ -207,8 +210,10 @@ func (r *restfulServer) Start() error {
 	r.opts.Address = config.Address
 	r.mux.Unlock()
 	r.container.Add(r.ws)
+	sslFlag := ""
 	if r.opts.TLSConfig != nil {
 		r.server = &http.Server{Addr: config.Address, Handler: r.container, TLSConfig: r.opts.TLSConfig}
+		sslFlag = openTLS
 	} else {
 		r.server = &http.Server{Addr: config.Address, Handler: r.container}
 	}
@@ -223,7 +228,7 @@ func (r *restfulServer) Start() error {
 		return fmt.Errorf("failed to start listener: %s", err.Error())
 	}
 
-	registry.InstanceEndpoints[config.ProtocolServerName] = net.JoinHostPort(lIP, lPort)
+	registry.InstanceEndpoints[config.ProtocolServerName] = net.JoinHostPort(lIP, lPort) + sslFlag
 
 	go func() {
 		err = r.server.Serve(l)
@@ -234,16 +239,12 @@ func (r *restfulServer) Start() error {
 
 	}()
 
-	openlogging.GetLogger().Infof("Restful server listening on: %s", registry.InstanceEndpoints[config.ProtocolServerName])
+	openlogging.GetLogger().Infof("http server is listening at %s", registry.InstanceEndpoints[config.ProtocolServerName])
 	return nil
 }
 
 //register to swagger ui,Whether to create a schema, you need to refer to the configuration.
-func (r *restfulServer) CreateLocalSchema(config server.Options) error {
-	if globalconfig.GlobalDefinition.Cse.NoRefreshSchema == true {
-		openlogging.Info("will not create schema file. if you want to change it, please update chassis.yaml->NoRefreshSchema=true")
-		return nil
-	}
+func (r *restfulServer) CreateLocalSchema(opts server.Options) error {
 	var path string
 	if path = schema.GetSchemaPath(runtime.ServiceName); path == "" {
 		return errors.New("schema path is empty")
@@ -259,12 +260,20 @@ func (r *restfulServer) CreateLocalSchema(config server.Options) error {
 	}
 	swaggerConfig := swagger.Config{
 		WebServices:     r.container.RegisteredWebServices(),
-		WebServicesUrl:  config.Address,
+		WebServicesUrl:  opts.Address,
 		ApiPath:         "/apidocs.json",
+		SwaggerPath:     "/swagger/",
 		FileStyle:       "yaml",
-		SwaggerFilePath: filepath.Join(path, runtime.ServiceName+".yaml")}
+		OpenService:     true,
+		SwaggerFilePath: "./swagger-ui/dist/",
+	}
+	if globalconfig.GlobalDefinition.Cse.NoRefreshSchema {
+		openlogging.Info("will not create schema file. if you want to change it, please update chassis.yaml->NoRefreshSchema=true")
+	} else {
+		swaggerConfig.OutFilePath = filepath.Join(path, runtime.ServiceName+".yaml")
+	}
 	sws := swagger.RegisterSwaggerService(swaggerConfig, r.container)
-	openlogging.Info("The schema has been created successfully. path:" + path)
+	openlogging.Info("contract has been created successfully. path:" + path)
 	//set schema information when create local schema file
 	err := schema.SetSchemaInfo(sws)
 	if err != nil {
